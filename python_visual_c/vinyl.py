@@ -32,16 +32,9 @@ PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs') # add c librar
             
 ### BUILD FORMATS ###
 
-CL_FMTS = {'SHAREDLIB': {'SINGLETHREAD': '/LD', 'MULTITHREAD': '/MD'},
-           'EXECUTABLE':{'SINGLETHREAD': '/ML', 'MULTITHREAD': '/MT'}
-          }
 
-CU_FMTS = {'SHAREDLIB': {'SINGLETHREAD': '--shared', 'MULTITHREAD': '--shared'},
-           'EXECUTABLE':{'SINGLETHREAD': '--shared', 'MULTITHREAD': '--shared'}
-          }
-
-FMTS = {'CL':   CL_FMTS, 
-        'NVCC': CU_FMTS
+FMTS = {'CL':   {'SHAREDLIB':'/MD', 'EXECUTABLE': '/MT'}, 
+        'NVCC': {'SHAREDLIB': '--shared', 'EXECUTABLE': ''}
        }
 
 MODE = {'CL':   {'DEBUG': 'd', 'RELEASE': ''},
@@ -63,7 +56,7 @@ DEFAULTS = {'COMPILER': ['CL'],
             'SOURCE': 'main.c',
             'OUTPUT': 'main.exe',
             'PLATE': [],
-            'FORMAT': ['executable', 'multithreaded', 'release'],
+            'FORMAT': ['EXECUTABLE', 'RELEASE'],
             'INCLUDE': [],
             'LIBS': [],
             'OPTIONS': []
@@ -123,16 +116,12 @@ def make_cmd(compiler,
         s = 'SHAREDLIB'
     else:
         s = 'EXECUTABLE'
-    if 'MULTITHREAD' in fmt:
-        m = 'MULTITHREAD'
-    else:
-        m = 'SINGLETHREAD'
     if 'DEBUG' in fmt:
         d = 'DEBUG'
     else:
         d = 'RELEASE'
     
-    build_format = FMTS[compiler][s][m] +MODE[compiler][d]
+    build_format = FMTS[compiler][s] +MODE[compiler][d]
 
     
     # HANDLE INCLUDES

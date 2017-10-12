@@ -13,8 +13,11 @@ IF "%1" == "generate" (
     SET "VSCMD_START_DIR="%cd%""
 
     :: Get build path
-    SET BUILD_PATH="%cd%"
-    IF NOT [%1]==[] (SET BUILD_PATH=%1)
+    IF NOT [%1]==[] (
+        SET BUILD_PATH=%1
+    ) ELSE (
+        SET BUILD_PATH="%cd%"
+    )
     ECHO %BUILD_PATH%
 
     :: Call vcvars, and build argument 1 with cl
