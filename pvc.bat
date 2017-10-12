@@ -14,7 +14,7 @@ IF "%1" == "generate" (
 
     :: Get build path
     SET BUILD_PATH="%cd%"
-    IF NOT [%1]==[] SET BUILD_PATH=%1
+    IF NOT [%1]==[] (SET BUILD_PATH=%1)
     ECHO %BUILD_PATH%
 
     :: Call vcvars, and build argument 1 with cl
