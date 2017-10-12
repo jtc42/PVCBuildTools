@@ -33,7 +33,7 @@ PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs') # add c librar
 ### BUILD FORMATS ###
 
 
-FMTS = {'CL':   {'SHAREDLIB':'/MD', 'EXECUTABLE': '/MT'}, 
+FMTS = {'CL':   {'SHAREDLIB':'/LD', 'EXECUTABLE': '/MT'}, 
         'NVCC': {'SHAREDLIB': '--shared', 'EXECUTABLE': ''}
        }
 
@@ -173,7 +173,6 @@ def get_master(path):
     for d in DEFAULTS.keys():
         if not d in data.keys():
             data[d] = DEFAULTS[d]
-            print("{} NOT FOUND IN VINYL. USING DEFAULT: {}".format(d, DEFAULTS[d]))
     
     print(data)
     return data
@@ -190,7 +189,8 @@ def press(path):
     dat = get_master(prs)
     
     cmd = make_cmd( dat['COMPILER'][0], dat['SOURCE'], dat['OUTPUT'][0], dat['PLATE'], dat['FORMAT'], dat['INCLUDE'], dat['LIBS'], dat['OPTIONS'] )
-
+    print(cmd+"\n")
+    
     if not dat['ARCHITECTURE']:
         dat['ARCHITECTURE'] = [HOST_ARCH]
 

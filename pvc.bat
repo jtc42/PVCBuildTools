@@ -22,8 +22,6 @@ IF "%1" == "generate" (
         SET BUILD_PATH="%cd%"
     )
     :: Delay parsing of BUILD_PATH until after IF statements have been evaluated, using !...!
-    ECHO !BUILD_PATH!
-
     :: Call vcvars, and build argument 1 with cl
     CALL python %BUILD_FILE% !BUILD_PATH!
 )
