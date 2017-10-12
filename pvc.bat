@@ -1,4 +1,5 @@
 @echo off
+setlocal ENABLEDELAYEDEXPANSION
 
 :: Path to vinyl script
 SET VINYL_PATH=%~dp0\python_visual_c
@@ -14,12 +15,15 @@ IF "%1" == "generate" (
 
     :: Get build path
     IF NOT [%1]==[] (
+        ECHO Using argument for build path
         SET BUILD_PATH=%1
     ) ELSE (
+        ECHO Using current directory for build path
         SET BUILD_PATH="%cd%"
     )
-    ECHO %BUILD_PATH%
+    :: Delay parsing of BUILD_PATH until after IF statements have been evaluated, using !...!
+    ECHO !BUILD_PATH!
 
     :: Call vcvars, and build argument 1 with cl
-    CALL python %BUILD_FILE% %BUILD_PATH%
+    CALL python %BUILD_FILE% !BUILD_PATH!
 )
