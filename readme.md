@@ -4,7 +4,7 @@
 * Add 'PVCBuildTools' folder to PATH environment variable
 * Run 'pvc generate' in the source directory to create initial vinyl.txt
 * Modify vinyl.txt by format below
-* Run 'pvc' in directory containing vinyl.txt, or run 'pvc <path to source folder>' from anywhere
+* Run 'pvc' in directory containing vinyl.txt, or run 'pvc \<path to source folder>' from anywhere
 
 ## vinyl.txt format
 
