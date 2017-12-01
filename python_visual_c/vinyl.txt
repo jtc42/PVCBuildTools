@@ -1,9 +1,11 @@
-COMPILER: CL
-ARCHITECTURE: x64
-SOURCE: main.cpp
-OUTPUT: main
-PLATE: 
-FORMAT: 
-INCLUDE: 
-LIBS: 
-OPTIONS:
+compiler = cl
+arch = x64
+
+flags = shared, debug
+options =
+
+source = main.cpp
+include =
+libs = 
+
+out = main.exe

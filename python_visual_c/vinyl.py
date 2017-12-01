@@ -12,174 +12,135 @@ import re
 import platform
 import subprocess
 import sys
+import logging
+from jinja2 import Template
 
-# ARGUMENTS
+# CMD ARGUMENTS
 try:
     PATH = os.path.abspath(str(sys.argv[1]))
-    print("Pressing vinyl from \"{}\"".format(PATH))
-except:
-    print("No build path given.")
+    print("Pressing vinyl from \"{}\"\n".format(PATH))
+except Exception as e:
+    logging.exception(e)
+    print("No build path given.\n")
     sys.exit()
 
 # GLOBAL VARIABLES
+HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]
 
-ARCHS = {'64bit': 'x64', '32bit': 'x86'}
-HOST_ARCH = ARCHS[platform.architecture()[0]]
+PYTHON_PATHS = get_paths()  # Dictionary of key-paths
+PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs')  # Add c libraries to paths
 
-PYTHON_PATHS = get_paths()  # a dictionary of key-paths
-PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs') # add c libraries to paths
+# VISUAL C SETTINGS
+VCVARS = os.path.abspath(
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat")
 
-            
-### BUILD FORMATS ###
-
-
-FMTS = {'CL':   {'SHAREDLIB':'/LD', 'EXECUTABLE': '/MT'}, 
-        'NVCC': {'SHAREDLIB': '--shared', 'EXECUTABLE': ''}
-       }
-
-MODE = {'CL':   {'DEBUG': 'd', 'RELEASE': ''},
-        'NVCC': {'DEBUG': ' --debug', 'RELEASE': ''}
-       }
-
-FLAGS = {'NVCC': {'INCLUDE_DIR': '-I',
-                  'LIB_DIR'    : '-L'},
-         'CL':   {'INCLUDE_DIR': '/I',
-                  'LIB_DIR'    : '/LIBPATH:'}
-        }
-
-# CL_SETTINGS
-VCVARS = os.path.abspath("C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat")
-
-# VINYL OPTIONS
-DEFAULTS = {'COMPILER': ['CL'],
-            'ARCHITECTURE': [HOST_ARCH],
-            'SOURCE': 'main.c',
-            'OUTPUT': 'main.exe',
-            'PLATE': [],
-            'FORMAT': ['EXECUTABLE', 'RELEASE'],
-            'INCLUDE': [],
-            'LIBS': [],
-            'OPTIONS': []
+# VINYL DEFAULTS
+DEFAULTS = {'arch': [HOST_ARCH],
+            'out': 'a.out',
+            'flags': [],
+            'include': [],
+            'libs': [],
+            'options': []
             }
 
-"""
-FORMATS:
-    CXX:
-    cl <files> <options> <includes> /LINK <linklibs> /out:<output>
-    
-    CUDA:
-    nvcc <options> <includes> <linklibs> -o <output> <files>
-    
-"""
+# AUTO PARAMS
+AUTOPARAMS = {
+    'include': {
+        'PYTHON': PYTHON_PATHS['include'],
+        'NUMPY': os.path.join(numpy.get_include(), 'numpy'),
+    },
+    'libs': {
+        'PYTHON': PYTHON_PATHS['libs'],
+    },
+}
+
+
+# FUNCTIONS
+def autoparams(parameter_dictionary):
+    global AUTOPARAMS
+
+    for section, assignments in AUTOPARAMS.items():  # For each section in AUTOPARAMS
+        if section in parameter_dictionary:  # If that section exists in the params dictionary
+            parameter_dictionary[section] = [assignments[l] if l in assignments else l for l in
+                                             parameter_dictionary[section]]
+
+    return parameter_dictionary
+
 
 def list2string(lst):
     return ' '.join(lst)
 
 
-def make_cmd(compiler, 
-             source,
-             output,
-             plate,
-             fmt,
-             include,
-             libs,
-             options):
+def make_cmd(params):
+    templates = {
+        'cl': Template(
+            'cl'
+            '{% for source in params["source"] %} "{{source}}"{% endfor %}'
+            '{% if "shared" in params["flags"] %} /LD{% endif %}'
+            '{% for o in params["options"] %} "{{o}}"{% endfor %}'
+            '{% for i in params["include"] %} /I"{{i}}"{% endfor %}'
+            '{% if "libs" in params %} /link'
+            '{% for l in params["libs"] %} /LIBPATH:"{{l}}"{% endfor %}'
+            '{% endif %}'
+            '{% if "debug" in params["flags"] %} /DEBUG{% endif %}'
+            ' /out:"{{params["out"][0]}}" '
+        ),
+        'nvcc': Template(
+            'nvcc'
+            '{% if "shared" in params["flags"] %} --shared{% endif %}'
+            '{% if "debug" in params["flags"] %} --debug{% endif %}'
+            '{% for o in params["options"] %} "{{o}}"{% endfor %}'
+            '{% for i in params["include"] %} -I"{{i}}"{% endfor %}'
+            '{% for l in params["libs"] %} -L"{{l}}"{% endfor %}'
+            ' -o "{{params["out"][0]}}"'
+            '{% for source in params["source"] %} "{{source}}"{% endfor %}'
+        ),
+    }
 
-    
-    # HANDLE PLATES
-    if 'PYTHON' in plate or 'NUMPY' in plate:
-        include.append(PYTHON_PATHS['include'])
-        libs.append(PYTHON_PATHS['libs'])
-        if not 'SHAREDLIB' in fmt:
-            fmt.append('SHAREDLIB')
-    # If explicitally numpy, add numpy includes
-    if 'NUMPY' in plate:
-        include.append(os.path.join(numpy.get_include(), 'numpy'))
-        
-    # HANDLE OUTPUT EXTENSION
-    basename = os.path.splitext(output)[0]
-    extension = os.path.splitext(output)[1]
-    if 'PYTHON' in plate:
-        extension = '.pyd'
-    elif 'SHAREDLIB' in fmt:
-        extension = '.dll'
-    elif extension != '':
-        extension = os.path.splitext(output)[1]
+    compiler = params['compiler'][0]
+    if compiler in templates:
+        return templates[compiler].render(params=params)
     else:
-        extension = '.exe'
-    
-    build_output = basename + extension
-    
-    
-    # HANDLE BUILD FORMAT
-    if 'SHAREDLIB' in fmt:
-        s = 'SHAREDLIB'
-    else:
-        s = 'EXECUTABLE'
-    if 'DEBUG' in fmt:
-        d = 'DEBUG'
-    else:
-        d = 'RELEASE'
-    
-    build_format = FMTS[compiler][s] +MODE[compiler][d]
-
-    
-    # HANDLE INCLUDES
-    build_include = [ FLAGS[compiler]['INCLUDE_DIR'] + f for f in include ] # Build include list
-    build_libs    = [ FLAGS[compiler]['LIB_DIR'] + f for f in libs] # Build lib list
-    
-    # Make command array
-    c = []
-    if compiler == 'CL':
-        c.append('cl') # Compiler
-        c.append(list2string(source)) # Source files
-        c.append(build_format) # Build format
-        c.append(list2string(options)) # Custom options
-        c.append(list2string(build_include)) # Includes
-        c.append('/link') # Start linker
-        c.append(list2string(build_libs)) # Libraries
-        c.append('/out:' + build_output) # Output file
-        
-    elif compiler == 'NVCC':
-        c.append('nvcc') # Compiler
-        c.append(build_format) # Build format
-        c.append(list2string(options)) # Custom options
-        c.append(list2string(build_include)) # Includes
-        c.append(list2string(build_libs)) # Libraries
-        c.append('-o ' + build_output) # Output file
-        c.append(list2string(source)) # Source files
-
-    return list2string(c)
+        print("No template exists for the given compiler. Exiting.")
+        sys.exit()
 
 
-#TODO
 def get_master(path):
     # BUILD ARGUMENT DICTIONARY FROM VINYL FILE
     # ADD MISSING ARGUMENTS FROM 'DEFAULTS' dictionary
     with open(path) as f:
         content = f.readlines()
-    
-    content = [x.strip().replace(' ', '') for x in content] # Remove whitespace characters
-    #content = [c.split(':') for c in content] # Cut by colon
-    content = [re.split(':|,', c) for c in content] # Cut by colon
-    
+
+    content = [x.strip() for x in content]  # Remove newlines
+    content = [c for c in content if c != '']  # Strip empty lines
+    content = [re.split('[=,]', c) for c in content]  # Cut by colon+space (avoids chopping Windows paths)
+
+    # Strip leading and trailing whitespace
+    content = [[item.lstrip().rstrip() for item in section] for section in content]
+
     data = {}
     for c in content:
         if c[1:] != ['']:
             data[c[0]] = c[1:]
         else:
             data[c[0]] = []
-    
+
     for d in DEFAULTS.keys():
-        if not d in data.keys():
+        if d not in data.keys():
             data[d] = DEFAULTS[d]
-    
-    print(data)
+
+    # Replace autoparams with actual paths
+    data = autoparams(data)
+
+    # Print data
+    for k, v in data.items():
+        print(k, v)
+
     return data
 
 
 def subprocess_cmd(command):
-    process = subprocess.Popen(command,stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
     proc_stdout = process.communicate()[0].decode()
     print(proc_stdout)
 
@@ -187,48 +148,22 @@ def subprocess_cmd(command):
 def press(path):
     prs = os.path.join(path, 'vinyl.txt')
     dat = get_master(prs)
-    
-    cmd = make_cmd( dat['COMPILER'][0], dat['SOURCE'], dat['OUTPUT'][0], dat['PLATE'], dat['FORMAT'], dat['INCLUDE'], dat['LIBS'], dat['OPTIONS'] )
-    print(cmd+"\n")
-    
-    if not dat['ARCHITECTURE']:
-        dat['ARCHITECTURE'] = [HOST_ARCH]
 
-    env = "CALL \"" + VCVARS + "\" " + dat['ARCHITECTURE'][0]
-    cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
-    
-    command = cdd + '&' + env + '&' + cmd
-    
+    cmd = make_cmd(dat)
+
+    if not dat['arch']:
+        dat['arch'] = [HOST_ARCH]
+
+    if os.name == 'nt':
+        cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
+        env = 'CALL "' + VCVARS + '" ' + dat['arch'][0]
+        command = cdd + '&' + env + '&' + cmd
+    else:
+        print("NOT WINDOWS")
+        command = cmd
+
     subprocess_cmd(command)
-    
-    
 
-#################################################################### EXAMPLES
-#test_path = "D:\Joel\Development\Python scraps\_VINYL_Python Visual C\_TESTS\python_cuda_looper\module"
-press(PATH)
 
-"""
-#PYTHON MODULE, CUDA
-src = ['_pcuda.cpp', 'kernel.cu']
-inc = ['./']
-lib = []
-out = '_pcuda'
-plt = ['PYTHON', 'NUMPY']
-fmt = []
-opt = []
-
-print(make_cmd('NVCC', src, out, plt, fmt, inc, lib, opt))
-
-print('\n\n')
-
-#PYTHON MODULE, CL
-src = ['py_artest.cpp']
-inc = []
-lib = []
-out = 'py_artest'
-plt = ['PYTHON', 'NUMPY']
-fmt = []
-opt = []
-
-print(make_cmd('CL', src, out, plt, fmt, inc, lib, opt))
-"""
+if __name__ == "__main__":
+    press(PATH)
