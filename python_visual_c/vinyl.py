@@ -127,6 +127,7 @@ def get_master(path):
     else:
         data = load_txt(path)
 
+    # Replace empty fields with default data
     for d in DEFAULTS.keys():
         if d not in data.keys():
             data[d] = DEFAULTS[d]
@@ -161,9 +162,6 @@ def press(path):
 
     dat = get_master(prs)
     cmd = make_cmd(dat)
-
-    if not dat['arch']:
-        dat['arch'] = HOST_ARCH
 
     # TODO: Loop over architectures if a list, otherwise use string as arch
     # TODO: Handle Windows vs Not-Windows better than just printing "NOT WINDOWS"
