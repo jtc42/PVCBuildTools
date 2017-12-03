@@ -4,7 +4,7 @@ Created on Tue Oct 10 21:58:52 2017
 
 @author: jtc9242
 """
-
+import json
 import numpy
 from sysconfig import get_paths
 import os
@@ -15,14 +15,6 @@ import sys
 import logging
 from jinja2 import Template
 
-# CMD ARGUMENTS
-try:
-    PATH = os.path.abspath(str(sys.argv[1]))
-    print("Pressing vinyl from \"{}\"\n".format(PATH))
-except Exception as e:
-    logging.exception(e)
-    print("No build path given.\n")
-    sys.exit()
 
 # GLOBAL VARIABLES
 HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]
@@ -35,7 +27,7 @@ VCVARS = os.path.abspath(
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat")
 
 # VINYL DEFAULTS
-DEFAULTS = {'arch': [HOST_ARCH],
+DEFAULTS = {'arch': HOST_ARCH,
             'out': 'a.out',
             'flags': [],
             'include': [],
@@ -46,11 +38,11 @@ DEFAULTS = {'arch': [HOST_ARCH],
 # AUTO PARAMS
 AUTOPARAMS = {
     'include': {
-        'PYTHON': PYTHON_PATHS['include'],
-        'NUMPY': os.path.join(numpy.get_include(), 'numpy'),
+        '$PYTHON$': PYTHON_PATHS['include'],
+        '$NUMPY$': os.path.join(numpy.get_include(), 'numpy'),
     },
     'libs': {
-        'PYTHON': PYTHON_PATHS['libs'],
+        '$PYTHON$': PYTHON_PATHS['libs'],
     },
 }
 
@@ -83,7 +75,7 @@ def make_cmd(params):
             '{% for l in params["libs"] %} /LIBPATH:"{{l}}"{% endfor %}'
             '{% endif %}'
             '{% if "debug" in params["flags"] %} /DEBUG{% endif %}'
-            ' /out:"{{params["out"][0]}}" '
+            ' /out:"{{params["out"]}}" '
         ),
         'nvcc': Template(
             'nvcc'
@@ -92,12 +84,12 @@ def make_cmd(params):
             '{% for o in params["options"] %} "{{o}}"{% endfor %}'
             '{% for i in params["include"] %} -I"{{i}}"{% endfor %}'
             '{% for l in params["libs"] %} -L"{{l}}"{% endfor %}'
-            ' -o "{{params["out"][0]}}"'
+            ' -o "{{params["out"]}}"'
             '{% for source in params["source"] %} "{{source}}"{% endfor %}'
         ),
     }
 
-    compiler = params['compiler'][0]
+    compiler = params['compiler']
     if compiler in templates:
         return templates[compiler].render(params=params)
     else:
@@ -105,9 +97,7 @@ def make_cmd(params):
         sys.exit()
 
 
-def get_master(path):
-    # BUILD ARGUMENT DICTIONARY FROM VINYL FILE
-    # ADD MISSING ARGUMENTS FROM 'DEFAULTS' dictionary
+def load_txt(path):
     with open(path) as f:
         content = f.readlines()
 
@@ -124,6 +114,18 @@ def get_master(path):
             data[c[0]] = c[1:]
         else:
             data[c[0]] = []
+    return data
+
+
+def get_master(path):
+    # BUILD ARGUMENT DICTIONARY FROM VINYL FILE
+    # ADD MISSING ARGUMENTS FROM 'DEFAULTS' dictionary
+    file_name, extension = os.path.splitext(path)
+
+    if extension == ".json":
+        data = json.load(open(path))
+    else:
+        data = load_txt(path)
 
     for d in DEFAULTS.keys():
         if d not in data.keys():
@@ -146,18 +148,30 @@ def subprocess_cmd(command):
 
 
 def press(path):
-    prs = os.path.join(path, 'vinyl.txt')
-    dat = get_master(prs)
 
+    if os.path.isfile(os.path.join(path, 'vinyl.json')):
+        prs = os.path.join(path, 'vinyl.json')
+        print("Pressing from json...")
+    elif os.path.isfile(os.path.join(path, 'vinyl.txt')):
+        prs = os.path.join(path, 'vinyl.txt')
+        print("Pressing from legacy text...")
+    else:
+        print("No vinyl file found. Exiting...")
+        sys.exit()
+
+    dat = get_master(prs)
     cmd = make_cmd(dat)
 
     if not dat['arch']:
-        dat['arch'] = [HOST_ARCH]
+        dat['arch'] = HOST_ARCH
 
+    # TODO: Loop over architectures if a list, otherwise use string as arch
+    # TODO: Handle Windows vs Not-Windows better than just printing "NOT WINDOWS"
     if os.name == 'nt':
         cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
-        env = 'CALL "' + VCVARS + '" ' + dat['arch'][0]
+        env = 'CALL "' + VCVARS + '" ' + dat['arch']
         command = cdd + '&' + env + '&' + cmd
+        print(cmd)
     else:
         print("NOT WINDOWS")
         command = cmd
@@ -166,4 +180,14 @@ def press(path):
 
 
 if __name__ == "__main__":
+    # CMD ARGUMENTS
+    try:
+        PATH = os.path.abspath(str(sys.argv[1]))
+        print("Pressing vinyl from \"{}\"\n".format(PATH))
+    except Exception as e:
+        logging.exception(e)
+        print("No build path given.\n")
+        PATH = "./"
+        #sys.exit()
+
     press(PATH)
