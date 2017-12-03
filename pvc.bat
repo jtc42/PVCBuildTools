@@ -1,14 +1,7 @@
-@echo on
-setlocal ENABLEDELAYEDEXPANSION
+@echo off
 
 :: Path to vinyl script
-SET VINYL_PATH=%~dp0\python_visual_c
-SET BUILD_FILE="%VINYL_PATH%\vinyl.py"
-SET TEMPL_FILE="%VINYL_PATH%\vinyl.txt"
-
-
-:: Set dev env path to current cmd path
-SET "VSCMD_START_DIR="%cd%""
+SET BUILD_FILE="%~dp0\python_visual_c\vinyl.py"
 
 :: Get build path
 IF NOT [%1]==[] (
@@ -19,7 +12,5 @@ IF NOT [%1]==[] (
     SET BUILD_PATH="%cd%"
 )
 
-ECHO %BUILD_PATH%
-:: Delay parsing of BUILD_PATH until after IF statements have been evaluated, using !...!
-:: Call vcvars, and build argument 1 with cl
+:: Call builder script
 CALL python %BUILD_FILE% %BUILD_PATH%
