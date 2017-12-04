@@ -8,26 +8,26 @@ import json
 import numpy
 from sysconfig import get_paths
 import os
-import re
 import platform
 import subprocess
 import sys
 import logging
 from jinja2 import Template
+from copy import copy
 
 
 # GLOBAL VARIABLES
-HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]
+HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
 
-PYTHON_PATHS = get_paths()  # Dictionary of key-paths
+PYTHON_PATHS = get_paths()  # Create dictionary of key-paths
 PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs')  # Add c libraries to paths
 
 # VISUAL C SETTINGS
 VCVARS = os.path.abspath(
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat")
 
-# VINYL DEFAULTS
-DEFAULTS = {'arch': HOST_ARCH,
+# VINYL PARAMETER DEFAULTS
+DEFAULTS = {'arch': [HOST_ARCH],
             'out': 'a.out',
             'flags': [],
             'include': [],
@@ -35,7 +35,8 @@ DEFAULTS = {'arch': HOST_ARCH,
             'options': []
             }
 
-# AUTO PARAMS
+# AUTO-PARAMETERS
+# Used to add key includes/libs without knowing the path
 AUTOPARAMS = {
     'include': {
         '$PYTHON$': PYTHON_PATHS['include'],
@@ -48,7 +49,26 @@ AUTOPARAMS = {
 
 
 # FUNCTIONS
+def list2string(lst):
+    """
+    Convert a list of strings into a single, space-separated string
+    """
+    return ' '.join(lst)
+
+
+def subprocess_cmd(command):
+    """
+    Takes a command as a string, and runs it in a shell process
+    """
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+    proc_stdout = process.communicate()[0].decode()
+    print(proc_stdout)
+
+
 def autoparams(parameter_dictionary):
+    """
+    Takes a parameter dictionary, and converts autoparam references to their full paths
+    """
     global AUTOPARAMS
 
     for section, assignments in AUTOPARAMS.items():  # For each section in AUTOPARAMS
@@ -59,11 +79,7 @@ def autoparams(parameter_dictionary):
     return parameter_dictionary
 
 
-def list2string(lst):
-    return ' '.join(lst)
-
-
-def make_cmd(params):
+def make_cmd(params, path):
     templates = {
         'cl': Template(
             'cl'
@@ -90,42 +106,24 @@ def make_cmd(params):
     }
 
     compiler = params['compiler']
+
     if compiler in templates:
-        return templates[compiler].render(params=params)
+        # If running on windows, add build environment setup to command
+        if os.name == 'nt':
+            cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
+            env = 'CALL "' + VCVARS + '" ' + params['arch']
+            preamble = cdd + '&' + env + '&'
+        else:
+            preamble = ''
+
+        return preamble + templates[compiler].render(params=params)
     else:
         print("No template exists for the given compiler. Exiting.")
         sys.exit()
 
 
-def load_txt(path):
-    with open(path) as f:
-        content = f.readlines()
-
-    content = [x.strip() for x in content]  # Remove newlines
-    content = [c for c in content if c != '']  # Strip empty lines
-    content = [re.split('[=,]', c) for c in content]  # Cut by colon+space (avoids chopping Windows paths)
-
-    # Strip leading and trailing whitespace
-    content = [[item.lstrip().rstrip() for item in section] for section in content]
-
-    data = {}
-    for c in content:
-        if c[1:] != ['']:
-            data[c[0]] = c[1:]
-        else:
-            data[c[0]] = []
-    return data
-
-
-def get_master(path):
-    # BUILD ARGUMENT DICTIONARY FROM VINYL FILE
-    # ADD MISSING ARGUMENTS FROM 'DEFAULTS' dictionary
-    file_name, extension = os.path.splitext(path)
-
-    if extension == ".json":
-        data = json.load(open(path))
-    else:
-        data = load_txt(path)
+def load_params(path):
+    data = json.load(open(path))
 
     # Replace empty fields with default data
     for d in DEFAULTS.keys():
@@ -135,6 +133,11 @@ def get_master(path):
     # Replace autoparams with actual paths
     data = autoparams(data)
 
+    # Convert ambiguous paramaters into a 1-element list
+    for p in ["arch", "source"]:  # For each parameter that can be either a list or a string
+        if type(data[p]) == str:  # If the parameter is a string
+            data[p] = [data[p]]  # Convert parameter into a 1-element list
+
     # Print data
     for k, v in data.items():
         print(k, v)
@@ -142,50 +145,52 @@ def get_master(path):
     return data
 
 
-def subprocess_cmd(command):
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-    proc_stdout = process.communicate()[0].decode()
-    print(proc_stdout)
-
-
-def press(path):
-
-    if os.path.isfile(os.path.join(path, 'vinyl.json')):
-        prs = os.path.join(path, 'vinyl.json')
-        print("Pressing from json...")
-    elif os.path.isfile(os.path.join(path, 'vinyl.txt')):
-        prs = os.path.join(path, 'vinyl.txt')
-        print("Pressing from legacy text...")
+def press(path, store_script=False):
+    if os.path.isfile(os.path.join(path, 'vinyl.json')):  # If vinyl.json exists
+        params = load_params(os.path.join(path, 'vinyl.json'))  # Load json into parameter dictionary
     else:
         print("No vinyl file found. Exiting...")
         sys.exit()
 
-    dat = get_master(prs)
-    cmd = make_cmd(dat)
+    params_modified = copy(params)  # Create a copy of the parameters, for modifying and passing to build build
 
-    # TODO: Loop over architectures if a list, otherwise use string as arch
-    # TODO: Handle Windows vs Not-Windows better than just printing "NOT WINDOWS"
-    if os.name == 'nt':
-        cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
-        env = 'CALL "' + VCVARS + '" ' + dat['arch']
-        command = cdd + '&' + env + '&' + cmd
-        print(cmd)
-    else:
-        print("NOT WINDOWS")
-        command = cmd
+    # Loop over each build target
+    for arch in params["arch"]:  # For each target architecture
+        params_modified["arch"] = arch  # Set passed parameter architecture to target
 
-    subprocess_cmd(command)
+        # Set up and create build path
+        build_path = os.path.join(path, "build", params_modified["arch"])  # Calculate build path
+        if not os.path.exists(build_path):  # If build path does not exist
+            os.makedirs(build_path)  # Create build path
+        params_modified["out"] = os.path.join(build_path, params["out"])  # Add build path to output file name
+
+        # Build the build command
+        cmd = make_cmd(params_modified, path)
+
+        # TODO: Have this option stored in a vinyl parameter
+        # If storing the build command, save as a shell script file
+        if store_script:
+            # Save build command to file
+            if os.name == 'nt':
+                fmt = "bat"
+            else:
+                fmt = "sh"
+            file_name = "build_{}.{}".format(arch, fmt)
+            with open(file_name, "w") as file:
+                file.write(cmd)
+
+        # Process build command
+        subprocess_cmd(cmd)
 
 
 if __name__ == "__main__":
-    # CMD ARGUMENTS
+    # TODO: Handle lack of path argument nicer than try/except
     try:
-        PATH = os.path.abspath(str(sys.argv[1]))
+        PATH = os.path.abspath(str(sys.argv[1]))  # Get path to build, from shell argument
         print("Pressing vinyl from \"{}\"\n".format(PATH))
-    except Exception as e:
-        logging.exception(e)
+    except Exception as e:  # If no path argument was provided
+        logging.exception(e)  # Log the error
         print("No build path given.\n")
-        PATH = "./"
-        #sys.exit()
+        sys.exit()
 
-    press(PATH)
+    press(PATH)  # Start build process
