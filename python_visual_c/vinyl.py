@@ -28,6 +28,7 @@ VCVARS = os.path.abspath(
 
 # VINYL PARAMETER DEFAULTS
 DEFAULTS = {'arch': [HOST_ARCH],
+            'msvcver': None,
             'out': 'a.out',
             'flags': [],
             'include': [],
@@ -41,9 +42,11 @@ AUTOPARAMS = {
     'include': {
         '$PYTHON$': PYTHON_PATHS['include'],
         '$NUMPY$': os.path.join(numpy.get_include(), 'numpy'),
+        '$CUDA$': os.path.join(os.environ['CUDA_PATH'], 'include')
     },
     'libs': {
         '$PYTHON$': PYTHON_PATHS['libs'],
+        '$CUDA$': os.path.join(os.environ['CUDA_PATH'], 'lib', HOST_ARCH)
     },
 }
 
@@ -69,6 +72,7 @@ def autoparams(parameter_dictionary):
     """
     Takes a parameter dictionary, and converts autoparam references to their full paths
     """
+    global HOST_ARCH
     global AUTOPARAMS
 
     for section, assignments in AUTOPARAMS.items():  # For each section in AUTOPARAMS
@@ -107,16 +111,33 @@ def make_cmd(params, path):
 
     compiler = params['compiler']
 
+    # If the specific compiler is compatible
     if compiler in templates:
+    
         # If running on windows, add build environment setup to command
         if os.name == 'nt':
+            # Allow extra vcvars arguments
+            vc_args = ''
+            # If VC version is specific
+            if params['msvcver']:
+                # Use old version of vcvars
+                vc_args = vc_args + '-vcvars_ver={} '.format(params['msvcver'])
+                
+            # Create command for start directory
             cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
-            env = 'CALL "' + VCVARS + '" ' + params['arch']
+            # Create command for environment
+            env = 'CALL "' + VCVARS + '" ' + params['arch'] + ' ' + vc_args
+            
+            # Join into general Windows preamble
             preamble = cdd + '&' + env + '&'
+            
+        # If not running on windows, no need for environment setup
         else:
             preamble = ''
-
+        # Return complete build script
         return preamble + templates[compiler].render(params=params)
+        
+    # If no compatible compiler is specified, exit the script now
     else:
         print("No template exists for the given compiler. Exiting.")
         sys.exit()
@@ -145,7 +166,7 @@ def load_params(path):
     return data
 
 
-def press(path, store_script=False):
+def press(path, store_script=True):
     if os.path.isfile(os.path.join(path, 'vinyl.json')):  # If vinyl.json exists
         params = load_params(os.path.join(path, 'vinyl.json'))  # Load json into parameter dictionary
     else:
