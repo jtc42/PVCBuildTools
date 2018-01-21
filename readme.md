@@ -2,26 +2,59 @@
 
 ## How-to
 * Add 'PVCBuildTools' folder to PATH environment variable
-* Run 'pvc generate' in the source directory to create initial vinyl.txt
-* Modify vinyl.txt by format below
-* Run 'pvc' in directory containing vinyl.txt, or run 'pvc \<path to source folder>' from anywhere
+* In your source directory, create vinyl.json in format below
+* Run 'pvc' in directory containing vinyl.json, or run 'pvc \<path to source folder>' from anywhere
 
-## vinyl.txt format
+## Example vinyl.json
+```
+{
+  "compiler": "cl",
+  "msvcver": 14.11,
+  
+  "arch": [
+    "x64",
+    "x86"
+  ],
 
-COMPILER: CL/NVCC
+  "flags": [
+    "debug"
+  ],
 
-ARCHITECTURE: x64/x86
+  "options": [],
 
-SOURCE: <source_1>,<source_2>, ...
+  "source": [
+    "main.cpp"
+  ],
 
-OUTPUT: <output_name>
+  "include": ["$PYTHON$"],
+  "libs": ["$PYTHON$"],
 
-PLATE: PYTHON, NUMPY
+  "out": "out.exe"
+}
+```
 
-FORMAT: SHAREDLIB/EXECUTABLE, SINGLETHREAD/MULTITHREAD, DEBUG/RELEASE
+## Vinyl properties
 
-INCLUDE: <include_path_1>, <include_path_2>, ...
+| Property  | Type | Notes |
+| ------------- | ------------- | ------------- |
+|**compiler**|(string) (required)|Compiler to build with. Currently supports "cl", and "nvcc".|
+|**msvcver**|(number) (optional)|Specify a version of MSVC to build with. Eg. 14.11 for building CUDA|
+|**arch**|(string, or list of strings) (optional)|Architecture(s) to build for. Eg. "x64", "x86", or ["x64","x86"]. If missing, defaults to hosts architecture. |
+|**flags**|(list of strings) (optional)|General build flags. Currently supports "shared", to build a shared library, and "debug" to build a debug output.|
+|**options**|(list of strings) (optional)|List of additional flags to pass directly to the compiler. Allows passing of arbitrary arguments for stuff not supported in PVC yet.|
+|**source**|(list of strings) (required)|Relative path to source file(s) to build.|
+|**include**|(list of strings) (required)|Paths to additional include directories. *Supports AUTOPARAMS (see below)*|
+|**libs**|(list of strings) (required)|Paths to additional library directories. *Supports AUTOPARAMS (see below)*|
+|**out**|(string) (required)|Full name of output file. File will be moved to '<source directory>/build/<architecture>'.|
+  
+  
+## Autoparams
+Autoparams allow the automatic inclusion of INCLUDE and LIB directories, based on keywords. For example, Python and CUDA libraries can be automatically found and added to the build command.
 
-LIBS: <lib_path_1>, <lib_path_2>, ...
+To add an autoparam, wrap a supported keyword in $$, as below:
 
-OPTIONS: <Custom build flags, comma separated>
+| Keyword  | Compatible properties | Notes |
+| ------------- | ------------- | ------------- |
+|**$PYTHON$**|include, libs|Finds directory of Python interpreter, and adds includes and libs required to build Python extensions|
+|**$NUMPY$**|include|Finds directory of numpy package, and adds includes required to build Python extensions using Numpy C API|
+|**$CUDA$**|include, libs|Finds directory of CUDA installation from 'config.json', and adds includes required to build CUDA code with nvcc compiler|
