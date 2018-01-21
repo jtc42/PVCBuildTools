@@ -19,13 +19,16 @@ from copy import copy
 # GLOBAL VARIABLES
 HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
 
+# PATH SETTINGS
 PYTHON_PATHS = get_paths()  # Create dictionary of key-paths
 PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs')  # Add c libraries to paths
 
-# VISUAL C SETTINGS
-VCVARS = os.path.abspath(
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat")
+THIS_PATH = os.path.dirname(os.path.abspath(__file__))
+CONFIG = json.load(open(os.path.join(THIS_PATH, './config.json')))
 
+VCVARS_PATH = CONFIG["vcvars_path"]
+CUDA_PATH = CONFIG["cuda_path"]
+    
 # VINYL PARAMETER DEFAULTS
 DEFAULTS = {'arch': [HOST_ARCH],
             'msvcver': None,
@@ -42,21 +45,20 @@ AUTOPARAMS = {
     'include': {
         '$PYTHON$': PYTHON_PATHS['include'],
         '$NUMPY$': os.path.join(numpy.get_include(), 'numpy'),
-        '$CUDA$': os.path.join(os.environ['CUDA_PATH'], 'include')
+        '$CUDA$': os.path.join(CUDA_PATH, 'include')
     },
     'libs': {
         '$PYTHON$': PYTHON_PATHS['libs'],
-        '$CUDA$': os.path.join(os.environ['CUDA_PATH'], 'lib', HOST_ARCH)
+        '$CUDA$': os.path.join(CUDA_PATH, 'lib', HOST_ARCH)
     },
 }
 
-
 # FUNCTIONS
-def list2string(lst):
+def list2string(lst, separator=' '):
     """
     Convert a list of strings into a single, space-separated string
     """
-    return ' '.join(lst)
+    return separator.join(lst)
 
 
 def subprocess_cmd(command):
@@ -82,8 +84,32 @@ def autoparams(parameter_dictionary):
 
     return parameter_dictionary
 
+    
+def win_env(params, path):
+    """
+    Constructs a command to set up VC environment in Windows, using vcvarsall
+    """
+    # Initially empty arguments to pass to vcvarsall
+    vc_args = ''
+    
+    # Add arguments to vcvarsall based on params
+    if params['msvcver']:  # If MSVC version is specific
+        # Use old version of MSVC
+        vc_args = vc_args + '-vcvars_ver={} '.format(params['msvcver'])
+        
+    # Create command for start directory
+    cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
+    # Create command for environment
+    env = 'CALL "' + os.path.join(VCVARS_PATH, "vcvarsall.bat") + '" ' + params['arch'] + ' ' + vc_args
+    
+    # Join into general Windows preamble
+    return cdd + '&' + env + '&'
+
 
 def make_cmd(params, path):
+    """
+    Constructs a command to set up environment and build
+    """
     templates = {
         'cl': Template(
             'cl'
@@ -113,27 +139,12 @@ def make_cmd(params, path):
 
     # If the specific compiler is compatible
     if compiler in templates:
-    
-        # If running on windows, add build environment setup to command
-        if os.name == 'nt':
-            # Allow extra vcvars arguments
-            vc_args = ''
-            # If VC version is specific
-            if params['msvcver']:
-                # Use old version of vcvars
-                vc_args = vc_args + '-vcvars_ver={} '.format(params['msvcver'])
-                
-            # Create command for start directory
-            cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
-            # Create command for environment
-            env = 'CALL "' + VCVARS + '" ' + params['arch'] + ' ' + vc_args
-            
-            # Join into general Windows preamble
-            preamble = cdd + '&' + env + '&'
-            
-        # If not running on windows, no need for environment setup
-        else:
-            preamble = ''
+
+        if os.name == 'nt':  # If running on windows
+            preamble = win_env(params, path)  #, Add build environment setup to command
+        else:  # If not running on windows
+            preamble = ''  # No need to preamble
+
         # Return complete build script
         return preamble + templates[compiler].render(params=params)
         
@@ -144,6 +155,10 @@ def make_cmd(params, path):
 
 
 def load_params(path):
+    """
+    Loads the json file at 'path', adds default params where not given, and parses autoparams.
+    Returns a complete dictionary of params
+    """
     data = json.load(open(path))
 
     # Replace empty fields with default data
@@ -161,12 +176,19 @@ def load_params(path):
 
     # Print data
     for k, v in data.items():
-        print(k, v)
+        if type(v) == list:
+            v = list2string(v, separator='; ')
+        print("{0: <10}: {1}".format(k, v))
+    print("\n")
 
     return data
 
 
 def press(path, store_script=True):
+    """
+    Reads 'vinyl.json' from 'path', 
+    constructs full build commands for eachh target architecture, stores them (optional), then runs them.
+    """
     if os.path.isfile(os.path.join(path, 'vinyl.json')):  # If vinyl.json exists
         params = load_params(os.path.join(path, 'vinyl.json'))  # Load json into parameter dictionary
     else:
