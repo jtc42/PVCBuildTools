@@ -9,6 +9,8 @@ reg Query "HKLM\Hardware\Description\System\CentralProcessor\0" | find /i "x86" 
 :: Set dev env path to current cmd path
 SET "VSCMD_START_DIR='%cd%'"
 
-:: Call vcvars, and build argument 1 with cl
-CALL %VCVARS_FILE% %OS%
-IF NOT [%1]==[] CALL cl %*
+:: Call vcvars
+CALL %VCVARS_FILE% %OS% -vcvars_ver=14.11
+
+:: Use argument 1 to call python script
+IF NOT [%1]==[] CALL python %*
