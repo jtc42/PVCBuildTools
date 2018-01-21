@@ -1,6 +1,11 @@
 {
   "compiler": "cl",
-  "arch": "x64",
+  "msvcver": 14.11,
+  
+  "arch": [
+    "x64",
+    "x86"
+  ],
 
   "flags": [
     "shared",
