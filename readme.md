@@ -1,10 +1,17 @@
 # PVC Build Tools
 
+## What is this?
+Compiling using Visual Studio Build Tools on Windows, using the command line, is a minor pain. One shared by a few people out there I'm sure. This Python script aims to alleviate this pain. It's a bit like CMake, but worse, but simpler. 
+
+Using a tiny json file in your source directory, `press.py` generates a build script that drops you into the correct VS environment, and compiles. It has some neat stuff like automatically finding Python and Numpy include/library directories, and will hopefully soon automatically find CUDA directories too.
+
+So far it only supports the `cl` and `nvcc` compilers, because that's all I use.
+
 ## How-to
-* Add 'PVCBuildTools' folder to PATH environment variable
-* In your source directory, create vinyl.json in format below
-  * Alternatively, run `makevinyl` in your source directory to easy-generate a basic vinyl.json
-* Run `press` (or `press.py`) in directory containing vinyl.json, or run `press <path to source folder>` from anywhere
+* Add the 'PVCBuildTools' folder to your PATH environment variable.
+* In your source directory, create vinyl.json in the format below.
+  * Alternatively, run `makevinyl` in your source directory to easy-generate a *basic* vinyl.json.
+* Run `press` (or `press.py`) in directory containing vinyl.json, or run `press <path to source folder>` from anywhere.
 
 ## Example vinyl.json
 ```
