@@ -8,6 +8,7 @@ Using a tiny json file in your source directory, `press.py` generates a build sc
 So far it only supports the `cl` and `nvcc` compilers, because that's all I use.
 
 ## How-to
+* Edit `PVCBuildTools\pvc\config.json` file to set your `vcvarsall` and CUDA directories.
 * Add the 'PVCBuildTools' folder to your PATH environment variable.
 * In your source directory, create vinyl.json in the format below.
   * Alternatively, run `makevinyl` in your source directory to easy-generate a *basic* vinyl.json.
