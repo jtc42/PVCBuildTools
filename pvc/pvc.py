@@ -14,6 +14,7 @@ import sys
 import logging
 from jinja2 import Template
 from copy import copy
+from argparse import ArgumentParser
 
 
 # GLOBAL VARIABLES
@@ -228,12 +229,14 @@ def press(path, store_script=True):
 
 if __name__ == "__main__":
     # TODO: Handle lack of path argument nicer than try/except
-    try:
-        PATH = os.path.abspath(str(sys.argv[1]))  # Get path to build, from shell argument
-        print("Pressing vinyl from \"{}\"\n".format(PATH))
-    except Exception as e:  # If no path argument was provided
-        logging.exception(e)  # Log the error
-        print("No build path given.\n")
-        sys.exit()
+    parser = ArgumentParser()
+    parser.add_argument("args",nargs="*")
+    a = parser.parse_args()
+    
+    if len(a.args) > 0: # If the zeroth argument is explicitly given
+        PATH = a.args[0]
+    else:
+        PATH = os.getcwd()
 
+    print("Running in {}".format(PATH))
     press(PATH)  # Start build process
