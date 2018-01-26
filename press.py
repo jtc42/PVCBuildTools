@@ -1,21 +1,17 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Oct 10 21:58:52 2017
-
-@author: jtc9242
-"""
 import os
 from argparse import ArgumentParser
 from pvc import pvc
 
-
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("args",nargs="*")
-    a = parser.parse_args()
     
-    if len(a.args) > 0: # If the zeroth argument is explicitly given
-        PATH = a.args[0]
+    # Handle unnamed positional arguments
+    parser.add_argument("positional_args",nargs="*")
+    args = parser.parse_args()
+    
+    if len(args.positional_args) > 0: # If the zeroth argument is explicitly given
+        PATH = args.positional_args[0]
     else:
         PATH = os.getcwd()
 

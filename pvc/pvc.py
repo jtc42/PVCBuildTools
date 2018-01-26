@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Oct 10 21:58:52 2017
-
-@author: jtc9242
-"""
 import json
 import numpy
 from sysconfig import get_paths
@@ -14,7 +9,6 @@ import sys
 import logging
 from jinja2 import Template
 from copy import copy
-from argparse import ArgumentParser
 
 
 # GLOBAL VARIABLES
@@ -32,7 +26,7 @@ CUDA_PATH = CONFIG["cuda_path"]
     
 # VINYL PARAMETER DEFAULTS
 DEFAULTS = {'arch': [HOST_ARCH],
-            'msvcver': None,
+            'vcvars_ver': None,
             'out': 'a.out',
             'flags': [],
             'include': [],
@@ -94,9 +88,9 @@ def win_env(params, path):
     vc_args = ''
     
     # Add arguments to vcvarsall based on params
-    if params['msvcver']:  # If MSVC version is specific
+    if params['vcvars_ver']:  # If MSVC version is specific
         # Use old version of MSVC
-        vc_args = vc_args + '-vcvars_ver={} '.format(params['msvcver'])
+        vc_args = vc_args + '-vcvars_ver={} '.format(params['vcvars_ver'])
         
     # Create command for start directory
     cdd = 'SET "VSCMD_START_DIR=""{}"""'.format(path)
@@ -225,18 +219,3 @@ def press(path, store_script=True):
 
         # Process build command
         subprocess_cmd(cmd)
-
-
-if __name__ == "__main__":
-    # TODO: Handle lack of path argument nicer than try/except
-    parser = ArgumentParser()
-    parser.add_argument("args",nargs="*")
-    a = parser.parse_args()
-    
-    if len(a.args) > 0: # If the zeroth argument is explicitly given
-        PATH = a.args[0]
-    else:
-        PATH = os.getcwd()
-
-    print("Running in {}".format(PATH))
-    press(PATH)  # Start build process
