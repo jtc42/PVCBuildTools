@@ -3,7 +3,8 @@
 ## How-to
 * Add 'PVCBuildTools' folder to PATH environment variable
 * In your source directory, create vinyl.json in format below
-* Run 'press' (or 'press.py') in directory containing vinyl.json, or run 'press \<path to source folder>' from anywhere
+  * Alternatively, run `makevinyl` in your source directory to easy-generate a basic vinyl.json
+* Run `press` (or `press.py`) in directory containing vinyl.json, or run `press <path to source folder>` from anywhere
 
 ## Example vinyl.json
 ```
