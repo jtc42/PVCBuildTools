@@ -110,12 +110,12 @@ def make_cmd(params, path):
             'cl'
             '{% for source in params["source"] %} "{{source}}"{% endfor %}'
             '{% if "shared" in params["flags"] %} /LD{% endif %}'
+            '{% if "debug" in params["flags"] %} /Zi{% endif %}'
             '{% for o in params["options"] %} "{{o}}"{% endfor %}'
             '{% for i in params["include"] %} /I"{{i}}"{% endfor %}'
             '{% if "libs" in params %} /link'
             '{% for l in params["libs"] %} /LIBPATH:"{{l}}"{% endfor %}'
             '{% endif %}'
-            '{% if "debug" in params["flags"] %} /DEBUG{% endif %}'
             ' /out:"{{params["out"]}}" '
         ),
         'nvcc': Template(
@@ -195,9 +195,14 @@ def press(path, store_script=True):
     # Loop over each build target
     for arch in params["arch"]:  # For each target architecture
         params_modified["arch"] = arch  # Set passed parameter architecture to target
+        
+        if "debug" in params_modified["flags"]:
+            build_dir = "debug"
+        else:
+            build_dir = "build"
 
         # Set up and create build path
-        build_path = os.path.join(path, "build", params_modified["arch"])  # Calculate build path
+        build_path = os.path.join(path, build_dir, params_modified["arch"])  # Calculate build path
         if not os.path.exists(build_path):  # If build path does not exist
             os.makedirs(build_path)  # Create build path
         params_modified["out"] = os.path.join(build_path, params["out"])  # Add build path to output file name
