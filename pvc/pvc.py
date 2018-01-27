@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import numpy
 from sysconfig import get_paths
 import os
 import platform
@@ -232,20 +231,6 @@ def press(path, store_script=True):
 # GLOBAL VARIABLES
 HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
 
-# PATHS FROM PYTHON ENVIRONMENT
-PYTHON_PATHS = get_paths()  # Create dictionary of key-paths
-PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs')  # Add c libraries to paths
-THIS_PATH = os.path.dirname(os.path.abspath(__file__))
-
-# PATHS FROM CONFIG
-CONFIG = json.load(open(os.path.join(THIS_PATH, './config.json')))
-VCVARS_PATH = CONFIG["vcvars_path"]
-
-# PATHS FROM EXECUTABLES
-CUDA_PATH = os.path.dirname(find_executable("nvcc")).split("\\bin")[0]
-if CUDA_PATH:
-    print("CUDA found at {}. Building with nvcc now supported.".format(CUDA_PATH))
-    
 # VINYL PARAMETER DEFAULTS
 DEFAULTS = {'arch': [HOST_ARCH],
             'vcvars_ver': None,
@@ -256,16 +241,36 @@ DEFAULTS = {'arch': [HOST_ARCH],
             'options': []
             }
 
-# AUTO-PARAMETERS
-# Used to add key includes/libs without knowing the path
+# AUTO PARAMETERS
 AUTOPARAMS = {
-    'include': {
-        '$PYTHON$': PYTHON_PATHS['include'],
-        '$NUMPY$': os.path.join(numpy.get_include(), 'numpy'),
-        '$CUDA$': os.path.join(CUDA_PATH, 'include')
-    },
-    'libs': {
-        '$PYTHON$': PYTHON_PATHS['libs'],
-        '$CUDA$': os.path.join(CUDA_PATH, 'lib', HOST_ARCH)
-    },
+    'include': {},
+    'libs': {},
 }
+
+# PATHS FROM CONFIG
+THIS_PATH = os.path.dirname(os.path.abspath(__file__))
+CONFIG = json.load(open(os.path.join(THIS_PATH, './config.json')))
+VCVARS_PATH = CONFIG["vcvars_path"]
+
+# PATHS FROM PYTHON ENVIRONMENT
+PYTHON_PATHS = get_paths()  # Create dictionary of key-paths
+if PYTHON_PATHS:
+    print("Python found at {}".format(PYTHON_PATHS['data']))
+    AUTOPARAMS['include']['$PYTHON$'] = PYTHON_PATHS['include']
+    AUTOPARAMS['libs']['$PYTHON$'] = os.path.join(PYTHON_PATHS['data'], 'libs')
+
+# PATHS FROM EXECUTABLES
+CUDA_PATH = os.path.dirname(find_executable("nvcc")).split("\\bin")[0]
+if CUDA_PATH:
+    print("CUDA found at {}".format(CUDA_PATH))
+    AUTOPARAMS['include']['$CUDA$'] = os.path.join(CUDA_PATH, 'include')
+    AUTOPARAMS['libs']['$CUDA$'] = os.path.join(CUDA_PATH, 'lib', HOST_ARCH)
+    
+# PATHS FROM PYTHON IMPORTS
+try:
+    import numpy
+except ImportError:
+    pass
+else:
+    print("Numpy includes found")
+    AUTOPARAMS['include']['$NUMPY$'] = os.path.join(numpy.get_include(), 'numpy')
