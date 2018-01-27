@@ -11,44 +11,43 @@ from jinja2 import Template
 from copy import copy
 
 
-# GLOBAL VARIABLES
-HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
-
-# PATH SETTINGS
-PYTHON_PATHS = get_paths()  # Create dictionary of key-paths
-PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs')  # Add c libraries to paths
-
-THIS_PATH = os.path.dirname(os.path.abspath(__file__))
-CONFIG = json.load(open(os.path.join(THIS_PATH, './config.json')))
-
-VCVARS_PATH = CONFIG["vcvars_path"]
-CUDA_PATH = CONFIG["cuda_path"]
-    
-# VINYL PARAMETER DEFAULTS
-DEFAULTS = {'arch': [HOST_ARCH],
-            'vcvars_ver': None,
-            'out': 'a.out',
-            'flags': [],
-            'include': [],
-            'libs': [],
-            'options': []
-            }
-
-# AUTO-PARAMETERS
-# Used to add key includes/libs without knowing the path
-AUTOPARAMS = {
-    'include': {
-        '$PYTHON$': PYTHON_PATHS['include'],
-        '$NUMPY$': os.path.join(numpy.get_include(), 'numpy'),
-        '$CUDA$': os.path.join(CUDA_PATH, 'include')
-    },
-    'libs': {
-        '$PYTHON$': PYTHON_PATHS['libs'],
-        '$CUDA$': os.path.join(CUDA_PATH, 'lib', HOST_ARCH)
-    },
-}
-
 # FUNCTIONS
+def find_executable(executable, path=None):
+    """
+    Borrowed liberally from techtonik/find_executable.py.
+    Find if 'executable' can be run. Looks for it in 'path'
+    (string that lists directories separated by 'os.pathsep';
+    defaults to os.environ['PATH']). Checks for all executable
+    extensions. Returns full path or None if no command is found.
+    """
+    if path is None:
+        path = os.environ['PATH']
+    paths = path.split(os.pathsep)
+    extlist = ['']
+    if os.name == 'os2':
+        (base, ext) = os.path.splitext(executable)
+        # executable files on OS/2 can have an arbitrary extension, but
+        # .exe is automatically appended if no dot is present in the name
+        if not ext:
+            executable = executable + ".exe"
+    elif sys.platform == 'win32':
+        pathext = os.environ['PATHEXT'].lower().split(os.pathsep)
+        (base, ext) = os.path.splitext(executable)
+        if ext.lower() not in pathext:
+            extlist = pathext
+    for ext in extlist:
+        execname = executable + ext
+        if os.path.isfile(execname):
+            return execname
+        else:
+            for p in paths:
+                f = os.path.join(p, execname)
+                if os.path.isfile(f):
+                    return f
+    else:
+        return None
+
+
 def list2string(lst, separator=' '):
     """
     Convert a list of strings into a single, space-separated string
@@ -56,13 +55,16 @@ def list2string(lst, separator=' '):
     return separator.join(lst)
 
 
-def subprocess_cmd(command):
+def subprocess_cmd(command, print_output = True):
     """
     Takes a command as a string, and runs it in a shell process
     """
     process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
     proc_stdout = process.communicate()[0].decode()
-    print(proc_stdout)
+    
+    if print_output:
+        print(proc_stdout)
+    return proc_stdout
 
 
 def autoparams(parameter_dictionary):
@@ -225,3 +227,45 @@ def press(path, store_script=True):
 
         # Process build command
         subprocess_cmd(cmd)
+
+
+# GLOBAL VARIABLES
+HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
+
+# PATHS FROM PYTHON ENVIRONMENT
+PYTHON_PATHS = get_paths()  # Create dictionary of key-paths
+PYTHON_PATHS['libs'] = os.path.join(PYTHON_PATHS['data'], 'libs')  # Add c libraries to paths
+THIS_PATH = os.path.dirname(os.path.abspath(__file__))
+
+# PATHS FROM CONFIG
+CONFIG = json.load(open(os.path.join(THIS_PATH, './config.json')))
+VCVARS_PATH = CONFIG["vcvars_path"]
+
+# PATHS FROM EXECUTABLES
+CUDA_PATH = os.path.dirname(find_executable("nvcc")).split("\\bin")[0]
+if CUDA_PATH:
+    print("CUDA found at {}. Building with nvcc now supported.".format(CUDA_PATH))
+    
+# VINYL PARAMETER DEFAULTS
+DEFAULTS = {'arch': [HOST_ARCH],
+            'vcvars_ver': None,
+            'out': 'a.out',
+            'flags': [],
+            'include': [],
+            'libs': [],
+            'options': []
+            }
+
+# AUTO-PARAMETERS
+# Used to add key includes/libs without knowing the path
+AUTOPARAMS = {
+    'include': {
+        '$PYTHON$': PYTHON_PATHS['include'],
+        '$NUMPY$': os.path.join(numpy.get_include(), 'numpy'),
+        '$CUDA$': os.path.join(CUDA_PATH, 'include')
+    },
+    'libs': {
+        '$PYTHON$': PYTHON_PATHS['libs'],
+        '$CUDA$': os.path.join(CUDA_PATH, 'lib', HOST_ARCH)
+    },
+}
