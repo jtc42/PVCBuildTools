@@ -214,7 +214,8 @@ def press(path, store_script=True):
             else:
                 fmt = "sh"
             file_name = "build_{}.{}".format(arch, fmt)
-            with open(file_name, "w") as file:
+            file_path = os.path.join(path, file_name)
+            with open(file_path, "w") as file:
                 file.write(cmd)
 
         # Process build command
