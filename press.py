@@ -15,5 +15,5 @@ if __name__ == "__main__":
     else:
         PATH = os.getcwd()
 
-    print("Running in {}".format(PATH))
+    print("Running in {}\n".format(PATH))
     pvc.press(PATH)  # Start build process
