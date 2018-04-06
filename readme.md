@@ -10,6 +10,7 @@ So far it only supports the `cl` and `nvcc` compilers, because that's all I use.
 ## How-to
 * Edit `PVCBuildTools\pvc\config.json` file to set your `vcvarsall` and CUDA directories.
 * Add the 'PVCBuildTools' folder to your PATH environment variable.
+* Add .PY to your PATHTEXT environment variable
 * In your source directory, create vinyl.json in the format below.
   * Alternatively, run `makevinyl` in your source directory to easy-generate a *basic* vinyl.json.
 * Run `press` (or `press.py`) in directory containing vinyl.json, or run `press <path to source folder>` from anywhere.
