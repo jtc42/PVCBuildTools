@@ -70,7 +70,6 @@ def autoparams(parameter_dictionary):
     """
     Takes a parameter dictionary, and converts autoparam references to their full paths
     """
-    global HOST_ARCH
     global AUTOPARAMS
 
     for section, assignments in AUTOPARAMS.items():  # For each section in AUTOPARAMS
@@ -166,7 +165,7 @@ def load_params(path):
     data = autoparams(data)
 
     # Convert ambiguous paramaters into a 1-element list
-    for p in ["arch", "source"]:  # For each parameter that can be either a list or a string
+    for p in ["source"]:  # For each parameter that can be either a list or a string
         if type(data[p]) == str:  # If the parameter is a string
             data[p] = [data[p]]  # Convert parameter into a 1-element list
 
@@ -180,59 +179,70 @@ def load_params(path):
     return data
 
 
-def press(path, store_script=True):
+def press(vinyl_path, store_script=True):
     """
-    Reads 'vinyl.json' from 'path', 
-    constructs full build commands for eachh target architecture, stores them (optional), then runs them.
+    Reads vinyl file from path, 
+    constructs full build commands for each target architecture, stores them (optional), then runs them.
     """
-    if os.path.isfile(os.path.join(path, 'vinyl.json')):  # If vinyl.json exists
-        params = load_params(os.path.join(path, 'vinyl.json'))  # Load json into parameter dictionary
-    else:
-        print("No vinyl file found. Exiting...")
-        sys.exit()
+    # Load json into parameter dictionary
+    params = load_params(vinyl_path) 
 
-    params_modified = copy(params)  # Create a copy of the parameters, for modifying and passing to build build
+    # Keep vinyl file directory
+    vinyl_dir = os.path.dirname(vinyl_path)
 
-    # Loop over each build target
-    for arch in params["arch"]:  # For each target architecture
-        params_modified["arch"] = arch  # Set passed parameter architecture to target
-        
-        if "debug" in params_modified["flags"]:
-            build_dir = "debug"
+
+    ### HANDLE BUILD PATH ###
+
+    # Set up and create build path
+    out_dir = os.path.dirname(params["out"])
+    out_fil = os.path.basename(params["out"])
+
+    # If output directory is relative path
+    if not os.path.isabs(out_dir):
+        # Join relative build path to vinyl file base path
+        out_dir = os.path.abspath(os.path.join(vinyl_dir, out_dir))
+
+    # If build path does not exist
+    if not os.path.exists(out_dir):  
+        # Create build path
+        os.makedirs(out_dir) 
+    
+    # Re-join build path and file name
+    params["out"] = os.path.join(out_dir, out_fil) 
+
+
+    ### CREATE BUILD SCRIPT ###
+
+    # Build the build command
+    cmd = make_cmd(params, vinyl_dir)
+
+    # If storing the build command, save as a shell script file
+    if "keepscript" in params["flags"]:
+        # Save build command to file
+        if os.name == 'nt':
+            fmt = "bat"
         else:
-            build_dir = "build"
+            fmt = "sh"
 
-        # Set up and create build path
-        build_path = os.path.join(path, build_dir, params_modified["arch"])  # Calculate build path
-        if not os.path.exists(build_path):  # If build path does not exist
-            os.makedirs(build_path)  # Create build path
-        params_modified["out"] = os.path.join(build_path, params["out"])  # Add build path to output file name
+        if "debug" in params["flags"]:
+            basename = "debug"
+        else:
+            basename = "build"
 
-        # Build the build command
-        cmd = make_cmd(params_modified, path)
+        file_name = "{}_{}.{}".format(basename, params["arch"], fmt)
+        file_path = os.path.join(vinyl_dir, file_name)
+        with open(file_path, "w") as file:
+            file.write(cmd)
 
-        # TODO: Have this option stored in a vinyl parameter
-        # If storing the build command, save as a shell script file
-        if store_script:
-            # Save build command to file
-            if os.name == 'nt':
-                fmt = "bat"
-            else:
-                fmt = "sh"
-            file_name = "build_{}.{}".format(arch, fmt)
-            file_path = os.path.join(path, file_name)
-            with open(file_path, "w") as file:
-                file.write(cmd)
-
-        # Process build command
-        subprocess_cmd(cmd)
+    # Process build command
+    subprocess_cmd(cmd)
 
 
 # GLOBAL VARIABLES
 HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
 
 # VINYL PARAMETER DEFAULTS
-DEFAULTS = {'arch': [HOST_ARCH],
+DEFAULTS = {'arch': HOST_ARCH,
             'vcvars_ver': None,
             'out': 'a.out',
             'flags': [],
