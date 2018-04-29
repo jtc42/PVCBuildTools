@@ -49,7 +49,7 @@ So far it only supports the `cl` and `nvcc` compilers, because that's all I use.
 | ------------- | ------------- | ------------- |
 |**compiler**|(string) (required)|Compiler to build with. Currently supports "cl", and "nvcc".|
 |**vcvars_ver**|(number) (optional)|Specify a version of MSVC to build with. Eg. 14.11 for building CUDA|
-|**arch**|(string, or list of strings) (optional)|Architecture(s) to build for. Eg. "x64", "x86", or ["x64","x86"]. If missing, defaults to hosts architecture. |
+|**arch**|(string) (optional)|Architecture to build for. Eg. "x64", "x86". If missing, defaults to hosts architecture. |
 |**flags**|(list of strings) (optional)|General build flags. Currently supports "shared", to build a shared library, and "debug" to build a debug output.|
 |**options**|(list of strings) (optional)|List of additional flags to pass directly to the compiler. Allows passing of arbitrary arguments for stuff not supported in PVC yet.|
 |**source**|(list of strings) (required)|Relative paths to source file(s) to build.|
