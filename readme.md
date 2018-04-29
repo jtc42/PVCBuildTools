@@ -5,7 +5,7 @@ Compiling using Visual Studio Build Tools on Windows, using the command line, is
 
 Using a tiny json file in your source directory, `press.py` generates a build script that drops you into the correct VS environment, and compiles. It has some neat stuff like automatically finding Python and Numpy include/library directories, and will hopefully soon automatically find CUDA directories too.
 
-So far it only supports the `cl` and `nvcc` compilers, because that's all I use.
+So far it supports the `cl` and `nvcc` compilers, with possibly broken support for `gcc` and `g++`.
 
 ## How-to
 * Edit `PVCBuildTools\pvc\config.json` file to set your `vcvarsall` and CUDA directories.
