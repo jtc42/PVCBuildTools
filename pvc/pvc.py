@@ -90,7 +90,6 @@ def autoparams(parameter_dictionary):
                     # Replace section value with corresponding AUTO_PARAM assignment
                     parameter_dictionary[section] = assignments[parameter_dictionary[section]]
 
-    print(parameter_dictionary)
     return parameter_dictionary
 
     
@@ -209,7 +208,7 @@ def load_params(path):
     for k, v in data.items():
         if type(v) == list:
             v = list2string(v, separator='; ')
-        print("{0: <10}: {1}".format(k, v))
+        print("{0: <12}: {1}".format(k, v))
     print("\n")
 
     return data
@@ -279,18 +278,25 @@ def press(vinyl_path, debug=False):
     subprocess_cmd(cmd)
 
 
+### GLOBAL ###
+print("Loading PVC Build Tools...\n")
+
 # GLOBAL VARIABLES
 HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
 
 # VINYL PARAMETER DEFAULTS
 DEFAULTS = {'arch': HOST_ARCH,
-            'vcvars_ver': None,
             'out': 'a.out',
             'flags': [],
             'include': [],
             'libs': [],
             'options': []
             }
+
+# Additional defaults for Windows build hosts
+if os.name == 'nt':
+    DEFAULTS['vcvars_ver'] = None
+
 
 # AUTO PARAMETERS
 AUTOPARAMS = {

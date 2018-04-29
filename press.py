@@ -21,11 +21,11 @@ if __name__ == "__main__":
 
         # If file doesn't exist, or isn't specified
         if not os.path.isfile(PATH):  
-            print("No valid vinyl file found. Exiting.")
+            print("\nNo valid vinyl file found. Exiting.\n")
             sys.exit()
         
-        print("Pressing {}...".format(PATH))
+        print("\nPressing {}...\n".format(PATH))
         pvc.press(PATH)  # Start build process
 
     else:
-        print("No vinyl file specified. Exiting.")
+        print("\nNo vinyl file specified. Exiting.\n")
