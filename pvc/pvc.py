@@ -76,9 +76,21 @@ def autoparams(parameter_dictionary):
 
     for section, assignments in AUTOPARAMS.items():  # For each section in AUTOPARAMS
         if section in parameter_dictionary:  # If that section exists in the params dictionary
-            parameter_dictionary[section] = [assignments[l] if l in assignments else l for l in
-                                             parameter_dictionary[section]]
 
+            # If that section is a list of items
+            if type(parameter_dictionary[section]) == list:
+                # If parameter dictionary section item is assigned in AUTO_PARAMS, use the assignment
+                # Else just use the original string
+                parameter_dictionary[section] = [assignments[l] if l in assignments else l for l in
+                                                parameter_dictionary[section]]
+            # If the section is a single value
+            else:
+                # If the section value is in the dictionary of AUTO_PARAM assignments
+                if parameter_dictionary[section] in assignments:
+                    # Replace section value with corresponding AUTO_PARAM assignment
+                    parameter_dictionary[section] = assignments[parameter_dictionary[section]]
+
+    print(parameter_dictionary)
     return parameter_dictionary
 
     
@@ -119,6 +131,28 @@ def make_cmd(params, path):
             '{% for l in params["libs"] %} /LIBPATH:"{{l}}"{% endfor %}'
             '{% endif %}'
             ' /out:"{{params["out"]}}" '
+        ),
+        'gcc': Template(
+            'gcc'
+            '{% if "shared" in params["flags"] %} -shared{% endif %}'
+            '{% if "debug" in params["flags"] %} -g{% endif %}'
+            '{% for o in params["options"] %} "{{o}}"{% endfor %}'
+            '{% for i in params["include"] %} -I"{{i}}"{% endfor %}'
+            '{% for l in params["libs"] %} -L"{{l}}"{% endfor %}'
+            ' -o "{{params["out"]}}"'
+            '{% if "shared" in params["flags"] %} -fPIC{% endif %}'
+            '{% for source in params["source"] %} "{{source}}"{% endfor %}'
+        ),
+        'g++': Template(
+            'g++'
+            '{% if "shared" in params["flags"] %} -shared{% endif %}'
+            '{% if "debug" in params["flags"] %} -g{% endif %}'
+            '{% for o in params["options"] %} "{{o}}"{% endfor %}'
+            '{% for i in params["include"] %} -I"{{i}}"{% endfor %}'
+            '{% for l in params["libs"] %} -L"{{l}}"{% endfor %}'
+            ' -o "{{params["out"]}}"'
+            '{% if "shared" in params["flags"] %} -fPIC{% endif %}'
+            '{% for source in params["source"] %} "{{source}}"{% endfor %}'
         ),
         'nvcc': Template(
             'nvcc'
@@ -260,9 +294,18 @@ DEFAULTS = {'arch': HOST_ARCH,
 
 # AUTO PARAMETERS
 AUTOPARAMS = {
+    'compiler': {},
     'include': {},
     'libs': {},
 }
+
+# COMPILER AUTO-PARAMS
+if os.name == 'nt':  # If running on windows
+    AUTOPARAMS['compiler']['$C$'] = 'cl'
+    AUTOPARAMS['compiler']['$C++$'] = 'cl'
+else:
+    AUTOPARAMS['compiler']['$C$'] = 'gcc'
+    AUTOPARAMS['compiler']['$C++$'] = 'g++'
 
 # PATHS FROM CONFIG
 THIS_PATH = os.path.dirname(os.path.abspath(__file__))
