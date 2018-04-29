@@ -9,6 +9,8 @@ import logging
 from jinja2 import Template
 from copy import copy
 
+from . import utilities
+
 
 # FUNCTIONS
 def find_executable(executable, path=None):
@@ -179,7 +181,7 @@ def load_params(path):
     return data
 
 
-def press(vinyl_path, store_script=True):
+def press(vinyl_path, debug=False):
     """
     Reads vinyl file from path, 
     constructs full build commands for each target architecture, stores them (optional), then runs them.
@@ -194,13 +196,11 @@ def press(vinyl_path, store_script=True):
     ### HANDLE BUILD PATH ###
 
     # Set up and create build path
-    out_dir = os.path.dirname(params["out"])
-    out_fil = os.path.basename(params["out"])
+    out_dir = os.path.dirname(params["out"])  # Path of output file
+    out_fil = os.path.basename(params["out"])  # Name of output file
 
     # If output directory is relative path
-    if not os.path.isabs(out_dir):
-        # Join relative build path to vinyl file base path
-        out_dir = os.path.abspath(os.path.join(vinyl_dir, out_dir))
+    out_dir = utilities.ensure_absolute(out_dir, vinyl_dir)
 
     # If build path does not exist
     if not os.path.exists(out_dir):  
@@ -211,9 +211,16 @@ def press(vinyl_path, store_script=True):
     params["out"] = os.path.join(out_dir, out_fil) 
 
 
+    ### HANDLE SOURCE PATHS ###
+    for i, src_path in enumerate(params["source"]):
+        params["source"][i] = utilities.ensure_absolute(src_path, vinyl_dir)
+
+
     ### CREATE BUILD SCRIPT ###
 
     # Build the build command
+    if debug:
+        print(params)
     cmd = make_cmd(params, vinyl_dir)
 
     # If storing the build command, save as a shell script file
