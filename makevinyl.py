@@ -52,9 +52,6 @@ else:
     else:
         params["compiler"] = "gcc"
 
-# Check ARCH
-if query_yes_no("Are you building for both x86 and x64?", default="no"):
-    params["arch"] = ["x64", "x86"]
 
 # Check shared library
 if query_yes_no("Are you building a shared library?", default="no"):

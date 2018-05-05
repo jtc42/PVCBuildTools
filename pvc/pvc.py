@@ -9,6 +9,8 @@ import logging
 from jinja2 import Template
 from copy import copy
 
+from . import utilities
+
 
 # FUNCTIONS
 def find_executable(executable, path=None):
@@ -70,13 +72,23 @@ def autoparams(parameter_dictionary):
     """
     Takes a parameter dictionary, and converts autoparam references to their full paths
     """
-    global HOST_ARCH
     global AUTOPARAMS
 
     for section, assignments in AUTOPARAMS.items():  # For each section in AUTOPARAMS
         if section in parameter_dictionary:  # If that section exists in the params dictionary
-            parameter_dictionary[section] = [assignments[l] if l in assignments else l for l in
-                                             parameter_dictionary[section]]
+
+            # If that section is a list of items
+            if type(parameter_dictionary[section]) == list:
+                # If parameter dictionary section item is assigned in AUTO_PARAMS, use the assignment
+                # Else just use the original string
+                parameter_dictionary[section] = [assignments[l] if l in assignments else l for l in
+                                                parameter_dictionary[section]]
+            # If the section is a single value
+            else:
+                # If the section value is in the dictionary of AUTO_PARAM assignments
+                if parameter_dictionary[section] in assignments:
+                    # Replace section value with corresponding AUTO_PARAM assignment
+                    parameter_dictionary[section] = assignments[parameter_dictionary[section]]
 
     return parameter_dictionary
 
@@ -118,6 +130,28 @@ def make_cmd(params, path):
             '{% for l in params["libs"] %} /LIBPATH:"{{l}}"{% endfor %}'
             '{% endif %}'
             ' /out:"{{params["out"]}}" '
+        ),
+        'gcc': Template(
+            'gcc'
+            '{% if "shared" in params["flags"] %} -shared{% endif %}'
+            '{% if "debug" in params["flags"] %} -g{% endif %}'
+            '{% for o in params["options"] %} "{{o}}"{% endfor %}'
+            '{% for i in params["include"] %} -I"{{i}}"{% endfor %}'
+            '{% for l in params["libs"] %} -L"{{l}}"{% endfor %}'
+            ' -o "{{params["out"]}}"'
+            '{% if "shared" in params["flags"] %} -fPIC{% endif %}'
+            '{% for source in params["source"] %} "{{source}}"{% endfor %}'
+        ),
+        'g++': Template(
+            'g++'
+            '{% if "shared" in params["flags"] %} -shared{% endif %}'
+            '{% if "debug" in params["flags"] %} -g{% endif %}'
+            '{% for o in params["options"] %} "{{o}}"{% endfor %}'
+            '{% for i in params["include"] %} -I"{{i}}"{% endfor %}'
+            '{% for l in params["libs"] %} -L"{{l}}"{% endfor %}'
+            ' -o "{{params["out"]}}"'
+            '{% if "shared" in params["flags"] %} -fPIC{% endif %}'
+            '{% for source in params["source"] %} "{{source}}"{% endfor %}'
         ),
         'nvcc': Template(
             'nvcc'
@@ -166,7 +200,7 @@ def load_params(path):
     data = autoparams(data)
 
     # Convert ambiguous paramaters into a 1-element list
-    for p in ["arch", "source"]:  # For each parameter that can be either a list or a string
+    for p in ["source"]:  # For each parameter that can be either a list or a string
         if type(data[p]) == str:  # If the parameter is a string
             data[p] = [data[p]]  # Convert parameter into a 1-element list
 
@@ -174,66 +208,84 @@ def load_params(path):
     for k, v in data.items():
         if type(v) == list:
             v = list2string(v, separator='; ')
-        print("{0: <10}: {1}".format(k, v))
+        print("{0: <12}: {1}".format(k, v))
     print("\n")
 
     return data
 
 
-def press(path, store_script=True):
+def press(vinyl_path, debug=False):
     """
-    Reads 'vinyl.json' from 'path', 
-    constructs full build commands for eachh target architecture, stores them (optional), then runs them.
+    Reads vinyl file from path, 
+    constructs full build commands for each target architecture, stores them (optional), then runs them.
     """
-    if os.path.isfile(os.path.join(path, 'vinyl.json')):  # If vinyl.json exists
-        params = load_params(os.path.join(path, 'vinyl.json'))  # Load json into parameter dictionary
-    else:
-        print("No vinyl file found. Exiting...")
-        sys.exit()
+    # Load json into parameter dictionary
+    params = load_params(vinyl_path) 
 
-    params_modified = copy(params)  # Create a copy of the parameters, for modifying and passing to build build
+    # Keep vinyl file directory
+    vinyl_dir = os.path.dirname(vinyl_path)
 
-    # Loop over each build target
-    for arch in params["arch"]:  # For each target architecture
-        params_modified["arch"] = arch  # Set passed parameter architecture to target
-        
-        if "debug" in params_modified["flags"]:
-            build_dir = "debug"
+
+    ### HANDLE BUILD PATH ###
+
+    # Set up and create build path
+    out_dir = os.path.dirname(params["out"])  # Path of output file
+    out_fil = os.path.basename(params["out"])  # Name of output file
+
+    # If output directory is relative path
+    out_dir = utilities.ensure_absolute(out_dir, vinyl_dir)
+
+    # If build path does not exist
+    if not os.path.exists(out_dir):  
+        # Create build path
+        os.makedirs(out_dir) 
+    
+    # Re-join build path and file name
+    params["out"] = os.path.join(out_dir, out_fil) 
+
+
+    ### HANDLE SOURCE PATHS ###
+    for i, src_path in enumerate(params["source"]):
+        params["source"][i] = utilities.ensure_absolute(src_path, vinyl_dir)
+
+
+    ### CREATE BUILD SCRIPT ###
+
+    # Build the build command
+    if debug:
+        print(params)
+    cmd = make_cmd(params, vinyl_dir)
+
+    # If storing the build command, save as a shell script file
+    if "keepscript" in params["flags"]:
+        # Save build command to file
+        if os.name == 'nt':
+            fmt = "bat"
         else:
-            build_dir = "build"
+            fmt = "sh"
 
-        # Set up and create build path
-        build_path = os.path.join(path, build_dir, params_modified["arch"])  # Calculate build path
-        if not os.path.exists(build_path):  # If build path does not exist
-            os.makedirs(build_path)  # Create build path
-        params_modified["out"] = os.path.join(build_path, params["out"])  # Add build path to output file name
+        if "debug" in params["flags"]:
+            basename = "debug"
+        else:
+            basename = "build"
 
-        # Build the build command
-        cmd = make_cmd(params_modified, path)
+        file_name = "{}_{}.{}".format(basename, params["arch"], fmt)
+        file_path = os.path.join(vinyl_dir, file_name)
+        with open(file_path, "w") as file:
+            file.write(cmd)
 
-        # TODO: Have this option stored in a vinyl parameter
-        # If storing the build command, save as a shell script file
-        if store_script:
-            # Save build command to file
-            if os.name == 'nt':
-                fmt = "bat"
-            else:
-                fmt = "sh"
-            file_name = "build_{}.{}".format(arch, fmt)
-            file_path = os.path.join(path, file_name)
-            with open(file_path, "w") as file:
-                file.write(cmd)
+    # Process build command
+    subprocess_cmd(cmd)
 
-        # Process build command
-        subprocess_cmd(cmd)
 
+### GLOBAL ###
+print("Loading PVC Build Tools...\n")
 
 # GLOBAL VARIABLES
 HOST_ARCH = {'64bit': 'x64', '32bit': 'x86'}[platform.architecture()[0]]  # Find host arch, convert to x64/x86 format
 
 # VINYL PARAMETER DEFAULTS
-DEFAULTS = {'arch': [HOST_ARCH],
-            'vcvars_ver': None,
+DEFAULTS = {'arch': HOST_ARCH,
             'out': 'a.out',
             'flags': [],
             'include': [],
@@ -241,11 +293,25 @@ DEFAULTS = {'arch': [HOST_ARCH],
             'options': []
             }
 
+# Additional defaults for Windows build hosts
+if os.name == 'nt':
+    DEFAULTS['vcvars_ver'] = None
+
+
 # AUTO PARAMETERS
 AUTOPARAMS = {
+    'compiler': {},
     'include': {},
     'libs': {},
 }
+
+# COMPILER AUTO-PARAMS
+if os.name == 'nt':  # If running on windows
+    AUTOPARAMS['compiler']['$C$'] = 'cl'
+    AUTOPARAMS['compiler']['$C++$'] = 'cl'
+else:
+    AUTOPARAMS['compiler']['$C$'] = 'gcc'
+    AUTOPARAMS['compiler']['$C++$'] = 'g++'
 
 # PATHS FROM CONFIG
 THIS_PATH = os.path.dirname(os.path.abspath(__file__))
