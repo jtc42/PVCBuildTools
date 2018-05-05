@@ -47,7 +47,7 @@ So far it supports the `cl` and `nvcc` compilers, with possibly broken support f
 
 | Property  | Type | Notes |
 | ------------- | ------------- | ------------- |
-|**compiler**|(string) (required)|Compiler to build with. Currently supports "cl", and "nvcc".|
+|**compiler**|(string) (required)|Compiler to build with. Currently supports "cl", "nvcc", "gcc", and "g++". *Supports AUTOPARAMS (see below)*|
 |**vcvars_ver**|(number) (optional)|Specify a version of MSVC to build with. Eg. 14.11 for building CUDA|
 |**arch**|(string) (optional)|Architecture to build for. Eg. "x64", "x86". If missing, defaults to hosts architecture. |
 |**flags**|(list of strings) (optional)|General build flags. Currently supports "shared", to build a shared library, and "debug" to build a debug output.|
