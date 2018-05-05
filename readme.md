@@ -3,7 +3,7 @@
 ## What is this?
 Compiling using Visual Studio Build Tools on Windows, using the command line, is a minor pain. One shared by a few people out there I'm sure. This Python script aims to alleviate this pain. It's a bit like CMake, but worse, but simpler. 
 
-Using a tiny json file in your source directory, `press.py` generates a build script that drops you into the correct VS environment, and compiles. It has some neat stuff like automatically finding Python and Numpy include/library directories, and will hopefully soon automatically find CUDA directories too.
+Using a tiny json file in your source directory, `press.py` generates a build script that drops you into the correct VS environment, and compiles. It has some neat stuff like automatically finding Python, Numpy, and CUDA include/library directories.
 
 So far it supports the `cl` and `nvcc` compilers, with possibly broken support for `gcc` and `g++`.
 
